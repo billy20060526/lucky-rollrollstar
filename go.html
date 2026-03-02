@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>🔫 隨機幸運開箱</title>
+    <style>
+        /* CSGO 暗色風格 */
+        body { font-family: 'Arial', sans-serif; background-color: #1a1b21; color: white; display: flex; flex-direction: column; align-items: center; padding: 50px; overflow-x: hidden; }
+        .container { background: rgba(45, 47, 56, 0.9); padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 800px; text-align: center; border: 1px solid #3a3c49; }
+        
+        /* 輸入區域 */
+        textarea { width: 100%; height: 100px; border: 1px solid #3a3c49; border-radius: 5px; padding: 10px; box-sizing: border-box; background-color: #101114; color: #ccc; font-size: 16px; margin-bottom: 20px; }
+        
+        /* 開箱按鈕 (CSGO 黃色) */
+        .draw-btn { background: linear-gradient(180deg, #e4b419 0%, #c49610 100%); color: black; border: none; padding: 15px 40px; border-radius: 5px; font-size: 20px; font-weight: bold; cursor: pointer; transition: 0.2s; text-transform: uppercase; box-shadow: 0 4px 0 #8d6c0b; }
+        .draw-btn:hover { background: linear-gradient(180deg, #f3c21a 0%, #d8a813 100%); transform: translateY(-2px); }
+        .draw-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #8d6c0b; }
+
+        /* --- 核心：開箱滾動區域 --- */
+        .case-wrapper { position: relative; width: 100%; height: 120px; margin: 40px 0; background-color: #101114; border: 2px solid #3a3c49; border-radius: 5px; overflow: hidden; display: none; /* 初始隱藏 */ }
+        
+        /* 中間的指針紅色垂直線 */
+        .pointer { position: absolute; top: 0; left: 50%; width: 2px; height: 100%; background-color: #ff4757; transform: translateX(-50%); z-index: 10; box-shadow: 0 0 10px rgba(255, 71, 87, 0.8); }
+
+        /* 滾動的輸送帶 */
+        .scroller { display: flex; position: absolute; top: 0; left: 0; height: 100%; will-change: transform; }
+        
+        /* 每個物品的方塊 */
+        .item { flex: 0 0 120px; /* 寬度固定 120px */ height: 100%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; color: #eee; border-right: 1px solid #2d2f38; box-sizing: border-box; padding: 10px; text-align: center; word-break: break-all; }
+        
+        /* 物品稀少度顏色 (隨機分配) */
+        .rarity-1 { border-bottom: 4px solid #4b69ff; } /* 藍色 - 工業 */
+        .rarity-2 { border-bottom: 4px solid #8847ff; } /* 紫色 - 受限 */
+        .rarity-3 { border-bottom: 4px solid #d32ce6; } /* 粉色 - 保密 */
+        .rarity-4 { border-bottom: 4px solid #eb4b4b; } /* 紅色 - 隱密 */
+        .rarity-5 { border-bottom: 4px solid #e4b419; background: rgba(228, 180, 25, 0.1); } /* 金色 - 罕見 */
+
+        /* 結果顯示 */
+        #result { margin-top: 20px; font-size: 28px; color: #e4b419; font-weight: bold; min-height: 40px; text-shadow: 0 0 10px rgba(228, 180, 25, 0.5); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎁 幸運開箱</h1>
+        <p>輸入參加者名單（一人一行）：</p>
+        <textarea id="nameList" placeholder="小明&#10;小美&#10;老王..."></textarea>
+        
+        <button class="draw-btn" id="drawBtn" onclick="startCaseOpening()">🔑 開始開箱</button>
+
+        <div class="case-wrapper" id="caseWrapper">
+            <div class="pointer"></div>
+            <div class="scroller" id="scroller">
+                </div>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const ITEM_WIDTH = 120; // 每個物品寬度
+        const SPIN_DURATION = 5; // 滾動持續時間 (秒)
+
+        function startCaseOpening() {
+            const text = document.getElementById("nameList").value;
+            const names = text.split('\n').filter(name => name.trim() !== "");
+
+            if (names.length < 2) {
+                alert("至少需要 2 位參加者才能開箱喔！");
+                return;
+            }
+
+            // 1. 初始化介面
+            const wrapper = document.getElementById("caseWrapper");
+            const scroller = document.getElementById("scroller");
+            const result = document.getElementById("result");
+            const btn = document.getElementById("drawBtn");
+            
+            wrapper.style.display = "block";
+            scroller.innerHTML = ""; // 清空舊的
+            scroller.style.transition = "none"; // 移除舊的動畫
+            scroller.style.transform = "translateX(0px)";
+            result.innerText = "";
+            btn.disabled = true; // 滾動時禁用按鈕
+            btn.innerText = "開箱中...";
+
+            // 2. 隨機決定中獎者
+            const winnerIndex = Math.floor(Math.random() * names.length);
+            const winnerName = names[winnerIndex];
+
+            // 3. 核心：建立「輸送帶」上的物品陣列
+            // 為了讓滾動看起來很長，我們把名單重複幾次，並打亂
+            const displayItems = [];
+            for (let i = 0; i < 60; i++) { // 輸送帶上一共放 60 個物品
+                const randomName = names[Math.floor(Math.random() * names.length)];
+                displayItems.push(randomName);
+            }
+
+            // 4. 把中獎者精確地放在「倒數第 10 個」位置 (這就是指針停下的地方)
+            const targetPos = displayItems.length - 10;
+            displayItems[targetPos] = winnerName;
+
+            // 5. 將物品渲染到網頁上
+            displayItems.forEach(name => {
+                const itemDiv = document.createElement("div");
+                itemDiv.className = `item rarity-${Math.floor(Math.random() * 5) + 1}`; // 隨機稀有度顏色
+                itemDiv.innerText = name;
+                scroller.appendChild(itemDiv);
+            });
+
+            // 6. 計算滾動距離 (重點！)
+            // 目標是讓中獎者 (targetPos) 剛好在 wrapper 的中間 (50%)
+            // 捲動距離 = (目標索引 * 物品寬度) - (容器寬度/2) + (物品寬度/2 用來校正中心點)
+            const wrapperWidth = wrapper.offsetWidth;
+            const finalScrollX = (targetPos * ITEM_WIDTH) - (wrapperWidth / 2) + (ITEM_WIDTH / 2);
+
+            // 7. 啟動減速動畫 (CSS transition cubic-bezier 是關鍵)
+            // cubic-bezier(0.1, 0, 0.1, 1) 提供一個長長的、慢慢減速的過程，像 CSGO 一樣
+            setTimeout(() => {
+                scroller.style.transition = `transform ${SPIN_DURATION}s cubic-bezier(0.1, 0, 0.1, 1)`;
+                scroller.style.transform = `translateX(-${finalScrollX}px)`;
+            }, 50); // 微小延遲確保 transition 生效
+
+            // 8. 動畫結束後顯示結果
+            setTimeout(() => {
+                result.innerText = `🎉 恭喜獲獎者： ${winnerName}`;
+                btn.disabled = false;
+                btn.innerText = "🔑 再次開箱";
+            }, SPIN_DURATION * 1000);
+        }
+    </script>
+
+</body>
+</html>
