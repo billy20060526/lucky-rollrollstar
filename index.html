@@ -58,6 +58,53 @@
     </div>
 
     <script>
+        // 1. 在函數外面先定義音效物件
+const clickSound = new Audio('click.mp3');
+const winSound = new Audio('win.mp3');
+
+function startCaseOpening() {
+    // ... 前面的代碼保持不變 ...
+
+    // 2. 監聽滾動過程播放聲音
+    let lastTickPos = 0;
+    
+    // 使用 requestAnimationFrame 監控位置，這樣聲音才會精準
+    function checkSound() {
+        // 取得目前 scroller 的水平位移
+        const currentTransform = new WebKitCSSMatrix(window.getComputedStyle(scroller).transform).m41;
+        const absX = Math.abs(currentTransform);
+        
+        // 算出目前經過了第幾個物品
+        const currentItemIndex = Math.floor((absX + (wrapperWidth / 2)) / ITEM_WIDTH);
+        
+        // 如果經過了新的物品，就響一聲
+        if (currentItemIndex !== lastTickPos) {
+            clickSound.currentTime = 0; // 強制重頭播放，才不會因為連點而沒聲音
+            clickSound.play();
+            lastTickPos = currentItemIndex;
+        }
+
+        // 動畫還在跑就繼續檢查
+        if (btn.disabled) {
+            requestAnimationFrame(checkSound);
+        }
+    }
+
+    // 3. 在啟動動畫時呼叫檢查函數
+    setTimeout(() => {
+        scroller.style.transition = `transform ${SPIN_DURATION}s cubic-bezier(0.1, 0, 0.1, 1)`;
+        scroller.style.transform = `translateX(-${finalScrollX}px)`;
+        checkSound(); // 開始檢查聲音
+    }, 50);
+
+    // 4. 動畫結束播放勝利音效
+    setTimeout(() => {
+        winSound.play();
+        result.innerText = `🎉 恭喜獲獎者： ${winnerName}`;
+        btn.disabled = false;
+        btn.innerText = "🔑 再次開箱";
+    }, SPIN_DURATION * 1000);
+}
         const ITEM_WIDTH = 120; // 每個物品寬度
         const SPIN_DURATION = 5; // 滾動持續時間 (秒)
 
@@ -132,3 +179,4 @@
 
 </body>
 </html>
+
